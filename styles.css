@@ -1,0 +1,39 @@
+
+
+/* initial rules */
+* {
+  box-sizing: border-box;
+  text-align: center;
+  font-family: Calibri, Trebuchet MS sans-serif;
+}
+
+
+/* layout */
+body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100vw;
+  height: 100vh;
+}
+
+/* heading */
+#title {
+  font-size: 3rem;
+}
+#description {
+  font-size: 1.2rem;
+}
+
+/* choropleth */
+main {
+  width: 100%;
+  height: auto;
+}
+
+
+/* footing */
+footer p {
+  font-size: 0.8rem;
+}
