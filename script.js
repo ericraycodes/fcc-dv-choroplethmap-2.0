@@ -34,7 +34,7 @@ function createChoroplethMap(USEd, USMap) {
 
 
 	// GEODATA: convert TopoJSON data to GeoJSON data
-	const nation = topojson.feature(USMap, USMap.objects.nation);
+	const nation = topojson.feature(USMap, USMap.objects["nation"]);
 	const states = topojson.feature(USMap, USMap.objects["states"]);
 	const counties = topojson.feature(USMap, USMap.objects["counties"]);
 	console.log("geojson nation:", nation);
@@ -45,7 +45,12 @@ function createChoroplethMap(USEd, USMap) {
 		"features"	: nation.features.concat(states.features).concat(counties.features)
 	};
 	
-	// PROJECTION
+	/** PROJECTION
+	 * @projection: geoIdentity(), this is to retain the pre-projection of
+	 * geoAlbersUsa() on the TopoJSON data. It is applied with
+	 * 'projection.fitExtent()' method to automatically position the map
+	 * within the SVG's dimension.
+	 */
 	const pad = 5;
 	const projection = d3.geoIdentity()
 		.fitExtent([[pad, pad], [width - pad, height - pad]], usGeoJSON);
@@ -53,19 +58,41 @@ function createChoroplethMap(USEd, USMap) {
 
 	// PATH GENERATOR
 	const path = d3.geoPath().projection(projection);
-	console.log("path generator:", path(nation), path(states), path(counties));
+	// console.log("path generator:", path(nation), path(states), path(counties));
 
 
 
 	// DRAW
+	// counties
 	svg.append("g")
 		.selectAll("path")
-		.data(usGeoJSON.features)
+		.data(counties.features)
+		.enter()
+		.append("path")
+			.attr("d", path)
+			.attr("class", "county")
+			.attr("fill", "none")
+			.attr("stroke", "lightgray");
+	// states
+	svg.append("g")
+		.selectAll("path")
+		.data(states.features)
 		.enter()
 		.append("path")
 			.attr("d", path)
 			.attr("fill", "none")
-			.attr("stroke", "blue");
+			.attr("stroke", "gray")
+			.attr("stroke-width", "1.25");
+	// nation
+	svg.append("g")
+		.selectAll("path")
+		.data(nation.features)
+		.enter()
+		.append("path")
+			.attr("d", path)
+			.attr("fill", "none")
+			.attr("stroke", "gray")
+			// .attr("stroke-width", "1");
 }
 
 
