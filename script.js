@@ -3,6 +3,10 @@
 
 
 /** DRAW CHOROPLETH
+ 	* @parameter Object USEd: a list of FIPS county codes on the percentage
+ 	*  of educational attainment in the US per county.
+ 	* @parameter Object USMap: a TopoJSON geodata for the map of the USA.
+ 	* 
  	* 1. Append the page's title and description texts.
  	* 2. Setup the SVG's dimensions.
  	* 3. Prepare the map's geodata.
@@ -40,20 +44,22 @@ function createChoroplethMap(USEd, USMap) {
 	console.log("geojson nation:", nation);
 	console.log("geojson states:", states);
 	console.log("geojson counties:", counties);
-	const usGeoJSON = {
-		"type"		: "FeatureCollection",
-		"features"	: nation.features.concat(states.features).concat(counties.features)
-	};
+	const countiesFips = counties.features.map(obj => {
+		obj.data = USEd.filter(data => data.fips === obj.id)[0];
+		return obj;
+	});
+	console.log("geojson counties with fips data:", countiesFips);
+
 	
 	/** PROJECTION
-	 * @projection: geoIdentity(), this is to retain the pre-projection of
-	 * geoAlbersUsa() on the TopoJSON data. It is applied with
-	 * 'projection.fitExtent()' method to automatically position the map
-	 * within the SVG's dimension.
+	 * @projection: geoIdentity()
+	 * 	This is to retain the pre-projection of geoAlbersUsa()
+	 * 	from the TopoJSON data. It is applied with 'projection.fitExtent()'
+	 * 	method to automatically position the map within the SVG's dimension.
 	 */
 	const pad = 5;
 	const projection = d3.geoIdentity()
-		.fitExtent([[pad, pad], [width - pad, height - pad]], usGeoJSON);
+		.fitExtent([[pad, pad], [width - pad, height - pad]], nation);
 
 
 	// PATH GENERATOR
@@ -62,17 +68,59 @@ function createChoroplethMap(USEd, USMap) {
 
 
 
+
+	// Educational rate and color representation scale
+	const edMin = d3.min(countiesFips, d => d.data.bachelorsOrHigher);
+	const edMax = d3.max(countiesFips, d => d.data.bachelorsOrHigher);
+	const edColorScale = d3.scaleQuantize()
+		.domain([edMin, edMax])
+		.range(d3.schemeBlues[9]);
+	console.log("color scale domain and range\n", edColorScale.domain(), edColorScale.range());
+	// tooltip
+	const tooltip = d3.select("#tooltip");
+
+
 	// DRAW
 	// counties
 	svg.append("g")
 		.selectAll("path")
-		.data(counties.features)
+		.data(countiesFips)
 		.enter()
 		.append("path")
 			.attr("d", path)
 			.attr("class", "county")
-			.attr("fill", "none")
-			.attr("stroke", "lightgray");
+			// county data
+			.attr("data-fips", d => d.id)
+			.attr("data-education", d => d.data.bachelorsOrHigher)
+			// county color fill
+			.attr("fill", d => edColorScale(d.data.bachelorsOrHigher))
+			.attr("stroke", "white")
+			.attr("stroke-width", "0.15")
+			// tooltip
+			.on("mouseover", d => {
+				console.count("mouseover");
+				const countyRect = d3.event.target.getBoundingClientRect();
+				tooltip
+					// county data-education
+					.attr("data-education", d.data.bachelorsOrHigher)
+					.html(`
+						<p class="area">${d.data.area_name}, ${d.data.state}:</p>
+						<p class="percentage">${d.data.bachelorsOrHigher}&percnt;</p>
+					`);
+				const tooltipRect = document.querySelector("#tooltip").getBoundingClientRect();
+				tooltip
+					.style("top", countyRect.y - (tooltipRect.height / 2) + "px")
+					.style("left", countyRect.right + 8 + "px")
+					.style("visibility", "visible");
+			})
+			.on("mouseout", d => {
+				console.count("mouseout");
+				tooltip
+					.style("visibility", "hidden")
+					.style("top", "0px")
+					.style("left", "0px")
+					.html("");
+			})
 	// states
 	svg.append("g")
 		.selectAll("path")
@@ -81,8 +129,8 @@ function createChoroplethMap(USEd, USMap) {
 		.append("path")
 			.attr("d", path)
 			.attr("fill", "none")
-			.attr("stroke", "gray")
-			.attr("stroke-width", "1.25");
+			.attr("stroke", "white")
+			.attr("stroke-width", "0.5");
 	// nation
 	svg.append("g")
 		.selectAll("path")
@@ -91,8 +139,8 @@ function createChoroplethMap(USEd, USMap) {
 		.append("path")
 			.attr("d", path)
 			.attr("fill", "none")
-			.attr("stroke", "gray")
-			// .attr("stroke-width", "1");
+			.attr("stroke", "white")
+			.attr("stroke-width", "1.5");
 }
 
 
