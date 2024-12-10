@@ -1,4 +1,4 @@
-
+	
 
 
 
@@ -97,9 +97,8 @@ function createChoroplethMap(USEd, USMap) {
 			.attr("stroke", "white")
 			.attr("stroke-width", "0.15")
 			// tooltip
-			.on("mouseover", d => {
-				console.count("mouseover");
-				const countyRect = d3.event.target.getBoundingClientRect();
+			.on("mouseover", (e, d) => {
+				const countyRect = e.target.getBoundingClientRect();
 				tooltip
 					// county data-education
 					.attr("data-education", d.data.bachelorsOrHigher)
@@ -113,8 +112,7 @@ function createChoroplethMap(USEd, USMap) {
 					.style("left", countyRect.right + 8 + "px")
 					.style("visibility", "visible");
 			})
-			.on("mouseout", d => {
-				console.count("mouseout");
+			.on("mouseout", () => {
 				tooltip
 					.style("visibility", "hidden")
 					.style("top", "0px")
@@ -141,6 +139,36 @@ function createChoroplethMap(USEd, USMap) {
 			.attr("fill", "none")
 			.attr("stroke", "white")
 			.attr("stroke-width", "1.5");
+
+
+	// Legend
+	const legend = d3.select("#legend-box");
+	const legendH = 50;
+	const legendW = 300;
+	const padLegendHor = 10;
+	const padLegendVer = 20;
+	const svgLegend = legend.append("svg")
+		.attr("id", "legend")
+		.attr("height", legendH)
+		.attr("width", legendW);
+	// percentile axis
+	const axisScale = d3.scaleLinear()
+		.domain([edMin, edMax])
+		.range([padLegendHor, legendW - padLegendHor]);
+	console.log("legend scale min-max(%):", axisScale.domain());
+	console.log("legend scale range(px):", axisScale.range());
+	const legendThresholds = edColorScale.thresholds();
+	console.log("legend thresholds:", legendThresholds);
+	const legendAxis = d3.axisBottom(axisScale);
+	svgLegend.append("g")
+		.call(legendAxis)
+		.attr("transform", `translate(0, ${legendH - padLegendVer})`);
+	// color representation squares
+	
+
+	
+
+
 }
 
 
