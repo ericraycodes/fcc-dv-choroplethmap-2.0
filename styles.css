@@ -36,13 +36,17 @@ main {
 #choropleth {
   border: 1px solid lightgray;
 }
+
+/* tooltip */
+.county {
+  transition: fill 0.5s;
+}
 .county:hover {
   fill: orange;
 }
 #tooltip {
   visibility: hidden;
   position: fixed;
-  /* border: 1px solid orange; */
   border-radius: 3px;
   background-color: floralwhite;
   opacity: 80%;
@@ -60,6 +64,10 @@ main {
   font-size: 95%;
 }
 
+/* legend */
+#legend {
+  border: 1px solid lightgray;
+}
 
 /* footing */
 footer p {

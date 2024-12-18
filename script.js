@@ -2,6 +2,70 @@
 
 
 
+/** Create a legend.
+ * 1. Select a node and append an SVG.
+ * 2. Prepare scales for the percentile axis and color representation.
+ * 3. Plot the colored RECTs and labeled ticks.
+ */
+const createLegend = (obj) => {
+	console.log("\ncreating a legend...", obj);
+
+	// append legend
+	const legend = d3.select(obj["node-id"]).append("svg")
+		.attr("id", "legend")
+		.attr("height", obj.height)
+		.attr("width", obj.width);
+
+	// percentile scale
+	const axisScale = obj.scale.axis
+		.domain(obj.domain)
+		.range([obj.pad.hor, obj.width - obj.pad.hor]);
+
+	// plot colored rects: [min, ...thresholds]
+	legend.selectAll("rect")
+		.data([obj.domain[0]].concat(obj.scale.color.domain()))
+		.enter()
+		.append("rect")
+			.attr("class", "color")
+			.attr("percentile-floor", d => d)
+			.attr("height", obj.pad.ver)
+			.attr("width", (d, i) => {
+				if (i < 8) return axisScale(obj.scale.color.domain()[i] - d);
+				else return axisScale(obj.domain[1] - d);
+			})
+			.attr("x", d => obj.scale.axis(d) )
+			.attr("y", obj.pad.ver)
+			.attr("fill", d => obj.scale.color(d));
+
+	// plot customized ticks and labels: [min, ...thresholds, max]
+	legend.selectAll("line")
+		.data(obj.scale.color.domain())
+		.enter()
+		.append("line")
+			.attr("class", "tick")
+			.attr("data-percentile", d => d)
+			.attr("x1", d => obj.scale.axis(d))
+			.attr("x2", d => obj.scale.axis(d))
+			.attr("y1", obj.pad.ver)
+			.attr("y2", obj.pad.ver*2.5)
+			.attr("stroke", "gray")
+			.attr("stroke-width", 1.5)
+	legend.selectAll("text")
+		.data(obj.scale.color.domain())
+		.enter()
+		.append("text")
+			.attr("class", "tick-value")
+			.attr("data-percentile", d => d)
+			.text(d => Math.round(d*100)/100 + "%")
+			.style("font-size", obj.height/5 + "px" )
+			.attr("x", d => obj.scale.axis(d))
+			.attr("y", obj.pad.ver*4)
+			.attr("transform", "translate(-7)");
+};
+
+
+
+
 /** DRAW CHOROPLETH
  	* @parameter Object USEd: a list of FIPS county codes on the percentage
  	*  of educational attainment in the US per county.
@@ -13,6 +77,8 @@
  	* 4. Select the map projection.
  	* 5. Create the path generator.
  	* 6. Draw the map in to the SVG.
+ 	* 7. Feature tooltip on counties on mouse-event.
+ 	* 8. Provide a legend of color-percentile-representation.
  	*/
 function createChoroplethMap(USEd, USMap) {
 	console.log("C H O R O P L E T H");
@@ -41,14 +107,10 @@ function createChoroplethMap(USEd, USMap) {
 	const nation = topojson.feature(USMap, USMap.objects["nation"]);
 	const states = topojson.feature(USMap, USMap.objects["states"]);
 	const counties = topojson.feature(USMap, USMap.objects["counties"]);
-	console.log("geojson nation:", nation);
-	console.log("geojson states:", states);
-	console.log("geojson counties:", counties);
 	const countiesFips = counties.features.map(obj => {
 		obj.data = USEd.filter(data => data.fips === obj.id)[0];
 		return obj;
 	});
-	console.log("geojson counties with fips data:", countiesFips);
 
 	
 	/** PROJECTION
@@ -64,23 +126,31 @@ function createChoroplethMap(USEd, USMap) {
 
 	// PATH GENERATOR
 	const path = d3.geoPath().projection(projection);
-	// console.log("path generator:", path(nation), path(states), path(counties));
 
 
 
 
 	// Educational rate and color representation scale
-	const edMin = d3.min(countiesFips, d => d.data.bachelorsOrHigher);
-	const edMax = d3.max(countiesFips, d => d.data.bachelorsOrHigher);
-	const edColorScale = d3.scaleQuantize()
-		.domain([edMin, edMax])
-		.range(d3.schemeBlues[9]);
-	console.log("color scale domain and range\n", edColorScale.domain(), edColorScale.range());
+	// const edMin = d3.min(countiesFips, d => d.data.bachelorsOrHigher);
+	// const edMax = d3.max(countiesFips, d => d.data.bachelorsOrHigher);
+	const edExtent = d3.extent(countiesFips, d => d.data.bachelorsOrHigher);
+	console.log("education data extent:", edExtent);
+	const k = 9;
+	const interval = (edExtent[1] - edExtent[0]) / k;
+	console.log("interval:", interval);
+	let percentileDomain = [];
+	for (let i=1; i<k; i++) {
+		percentileDomain.push(Math.floor(edExtent[0] + interval*i));
+	}
+	console.log("threshold domain:", percentileDomain);
+	const edColorScale = d3.scaleThreshold()
+		.domain(percentileDomain)
+		.range(d3.schemeBlues[k]);
 	// tooltip
 	const tooltip = d3.select("#tooltip");
 
 
-	// DRAW
+	// DRAW THE US MAP
 	// counties
 	svg.append("g")
 		.selectAll("path")
@@ -96,7 +166,7 @@ function createChoroplethMap(USEd, USMap) {
 			.attr("fill", d => edColorScale(d.data.bachelorsOrHigher))
 			.attr("stroke", "white")
 			.attr("stroke-width", "0.15")
-			// tooltip
+			// TOOLTIP
 			.on("mouseover", (e, d) => {
 				const countyRect = e.target.getBoundingClientRect();
 				tooltip
@@ -112,12 +182,13 @@ function createChoroplethMap(USEd, USMap) {
 					.style("left", countyRect.right + 8 + "px")
 					.style("visibility", "visible");
 			})
-			.on("mouseout", () => {
+			.on("mouseout", (e, d) => {
 				tooltip
 					.style("visibility", "hidden")
 					.style("top", "0px")
 					.style("left", "0px")
-					.html("");
+					.html("")
+					.attr("data-education", null);
 			})
 	// states
 	svg.append("g")
@@ -141,33 +212,16 @@ function createChoroplethMap(USEd, USMap) {
 			.attr("stroke-width", "1.5");
 
 
-	// Legend
-	const legend = d3.select("#legend-box");
-	const legendH = 50;
-	const legendW = 300;
-	const padLegendHor = 10;
-	const padLegendVer = 20;
-	const svgLegend = legend.append("svg")
-		.attr("id", "legend")
-		.attr("height", legendH)
-		.attr("width", legendW);
-	// percentile axis
-	const axisScale = d3.scaleLinear()
-		.domain([edMin, edMax])
-		.range([padLegendHor, legendW - padLegendHor]);
-	console.log("legend scale min-max(%):", axisScale.domain());
-	console.log("legend scale range(px):", axisScale.range());
-	const legendThresholds = edColorScale.thresholds();
-	console.log("legend thresholds:", legendThresholds);
-	const legendAxis = d3.axisBottom(axisScale);
-	svgLegend.append("g")
-		.call(legendAxis)
-		.attr("transform", `translate(0, ${legendH - padLegendVer})`);
-	// color representation squares
-	
-
-	
-
+	// LEGEND
+	const legendObject ={
+		"node-id" : "#legend-box",
+		"height" : 50,
+		"width" : 400,
+		"pad" : { "hor" : 20, "ver" : 10 },
+		"domain" : edExtent,
+		"scale" : { "axis" : d3.scaleLinear(), "color" : edColorScale },
+	}
+	createLegend(legendObject);
 
 }
 
@@ -192,7 +246,7 @@ document.addEventListener("DOMContentLoaded", () => {
 			d3.json(url2)
 		])
 		.then(data => {
-			console.log("Dataset fetched:", data[0], data[1]);
+			// console.log("Dataset fetched:", data[0], data[1]);
 			createChoroplethMap(data[0], data[1]);
 		})
 		.catch(err => console.log("Error! lacking dataset:", err));
